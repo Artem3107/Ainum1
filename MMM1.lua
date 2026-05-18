@@ -30,7 +30,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-MainFrame.Size = UDim2.new(0, 280, 0, 350)
+MainFrame.Size = UDim2.new(0, 280, 0, 300)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
@@ -129,100 +129,13 @@ CreateButton("Aim Look", UDim2.new(0, col2X, 0, startY), "Aim")
 CreateButton("Boost Speed", UDim2.new(0, col1X, 0, startY + gapY), "Boost")
 CreateButton("Stats", UDim2.new(0, col2X, 0, startY + gapY), "Stats")
 
--- ===== РЕГУЛЯТОР СКОРОСТИ БУСТА =====
-local boostSpeedLabel = Instance.new("TextLabel")
-boostSpeedLabel.Name = "BoostSpeedLabel"
-boostSpeedLabel.Parent = MainFrame
-boostSpeedLabel.Size = UDim2.new(0, 250, 0, 20)
-boostSpeedLabel.Position = UDim2.new(0, 15, 0, startY + gapY * 2 - 5)
-boostSpeedLabel.BackgroundTransparency = 1
-boostSpeedLabel.Text = "Boost Speed: 0.08"
-boostSpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-boostSpeedLabel.Font = Enum.Font.Gotham
-boostSpeedLabel.TextSize = 12
-boostSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local boostSpeedSlider = Instance.new("TextButton")
-boostSpeedSlider.Name = "BoostSpeedSlider"
-boostSpeedSlider.Parent = MainFrame
-boostSpeedSlider.Size = UDim2.new(0, 250, 0, 12)
-boostSpeedSlider.Position = UDim2.new(0, 15, 0, startY + gapY * 2 + 15)
-boostSpeedSlider.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-boostSpeedSlider.Text = ""
-boostSpeedSlider.BorderSizePixel = 0
-Instance.new("UICorner", boostSpeedSlider).CornerRadius = UDim.new(0, 6)
-
-local boostSpeedFill = Instance.new("Frame")
-boostSpeedFill.Name = "Fill"
-boostSpeedFill.Parent = boostSpeedSlider
-boostSpeedFill.BackgroundColor3 = Color3.fromRGB(70, 130, 70)
-boostSpeedFill.BorderSizePixel = 0
-boostSpeedFill.Size = UDim2.new(0.2, 0, 1, 0)
-Instance.new("UICorner", boostSpeedFill).CornerRadius = UDim.new(0, 6)
-
-local boostSpeedInput = Instance.new("TextBox")
-boostSpeedInput.Name = "BoostSpeedInput"
-boostSpeedInput.Parent = MainFrame
-boostSpeedInput.Size = UDim2.new(0, 60, 0, 25)
-boostSpeedInput.Position = UDim2.new(0, 200, 0, startY + gapY * 2 + 10)
-boostSpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-boostSpeedInput.Text = "0.08"
-boostSpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-boostSpeedInput.Font = Enum.Font.Gotham
-boostSpeedInput.TextSize = 12
-boostSpeedInput.BorderSizePixel = 0
-Instance.new("UICorner", boostSpeedInput).CornerRadius = UDim.new(0, 4)
-
--- Функция обновления отображения скорости буста
-local function updateBoostSpeedDisplay()
-    boostSpeedLabel.Text = string.format("Boost Speed: %.2f", Config.BoostSpeed)
-    boostSpeedInput.Text = string.format("%.2f", Config.BoostSpeed)
-    local fillPercent = math.min(Config.BoostSpeed / 0.5, 1) -- Максимум 0.5
-    boostSpeedFill.Size = UDim2.new(fillPercent, 0, 1, 0)
-end
-
--- Обработчик слайдера
-local draggingSlider = false
-boostSpeedSlider.MouseButton1Down:Connect(function()
-    draggingSlider = true
-end)
-
-UserInputService.InputEnded:Connect(function()
-    if draggingSlider then
-        draggingSlider = false
-    end
-end)
-
-boostSpeedSlider.MouseMoved:Connect(function()
-    if draggingSlider then
-        local mouse = Players:GetMouse()
-        local sliderPos = boostSpeedSlider.AbsolutePosition.X
-        local sliderSize = boostSpeedSlider.AbsoluteSize.X
-        local mouseX = mouse.X
-        local percent = math.max(0, math.min(1, (mouseX - sliderPos) / sliderSize))
-        Config.BoostSpeed = percent * 0.5 -- Максимум 0.5
-        updateBoostSpeedDisplay()
-    end
-end)
-
--- Обработчик текстового поля
-boostSpeedInput.FocusLost:Connect(function()
-    local value = tonumber(boostSpeedInput.Text)
-    if value then
-        Config.BoostSpeed = math.max(0, math.min(0.5, value))
-        updateBoostSpeedDisplay()
-    else
-        updateBoostSpeedDisplay()
-    end
-end)
-
 -- ===== КАСТОМНЫЕ КНОПКИ =====
 -- Anti-AFK
 local antiAfkBtn = Instance.new("TextButton")
 antiAfkBtn.Name = "Anti-AFK"
 antiAfkBtn.Parent = MainFrame
 antiAfkBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-antiAfkBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*2 + 50)
+antiAfkBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*2)
 antiAfkBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 antiAfkBtn.Text = "Anti-AFK: OFF"
 antiAfkBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -236,7 +149,7 @@ local unlockFpsBtn = Instance.new("TextButton")
 unlockFpsBtn.Name = "UnlockFPS"
 unlockFpsBtn.Parent = MainFrame
 unlockFpsBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-unlockFpsBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*2 + 50)
+unlockFpsBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*2)
 unlockFpsBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 unlockFpsBtn.Text = "Unlock FPS: OFF"
 unlockFpsBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -250,7 +163,7 @@ local antiFlingBtn = Instance.new("TextButton")
 antiFlingBtn.Name = "AntiFling"
 antiFlingBtn.Parent = MainFrame
 antiFlingBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-antiFlingBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*3 + 50)
+antiFlingBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*3)
 antiFlingBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 antiFlingBtn.Text = "Anti-Fling: OFF"
 antiFlingBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -264,7 +177,7 @@ local playerListBtn = Instance.new("TextButton")
 playerListBtn.Name = "PlayerListBtn"
 playerListBtn.Parent = MainFrame
 playerListBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-playerListBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*3 + 50)
+playerListBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*3)
 playerListBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 playerListBtn.Text = "Player List"
 playerListBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -278,7 +191,7 @@ local teleportBtn = Instance.new("TextButton")
 teleportBtn.Name = "TeleportBtn"
 teleportBtn.Parent = MainFrame
 teleportBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-teleportBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*4 + 50)
+teleportBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*4)
 teleportBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 teleportBtn.Text = "Teleport"
 teleportBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -590,4 +503,3 @@ end)
 -- Инициализация
 if Config.AntiAFK then startAntiAFK() end
 if Config.UnlockFPS then applyFPSUnlock() end
-updateBoostSpeedDisplay()
