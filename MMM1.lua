@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
 local lp = Players.LocalPlayer
 
 -- === СОСТОЯНИЕ ФУНКЦИЙ ===
@@ -13,10 +14,13 @@ local Config = {
     AntiAFK = false,
     UnlockFPS = false,
     AntiFling = false,
-    BoostSpeed = 0.08
+    BoostSpeed = 0.08   -- начальное значение
 }
 
 local selectedPlayer = nil
+local antiAFKThread = nil
+local lastFrameTime = tick()
+local lastStatsUpdate = tick()
 
 -- === СОЗДАНИЕ GUI ===
 local ScreenGui = Instance.new("ScreenGui")
@@ -30,7 +34,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-MainFrame.Size = UDim2.new(0, 280, 0, 300)
+MainFrame.Size = UDim2.new(0, 280, 0, 340)  -- чуть выше, чтобы поместилось поле ввода
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
@@ -123,19 +127,46 @@ local function CreateButton(name, position, toggleKey)
     return btn
 end
 
--- Обычные переключатели
+-- Создаём базовые кнопки
 CreateButton("Player ESP", UDim2.new(0, col1X, 0, startY), "ESP")
 CreateButton("Aim Look", UDim2.new(0, col2X, 0, startY), "Aim")
 CreateButton("Boost Speed", UDim2.new(0, col1X, 0, startY + gapY), "Boost")
 CreateButton("Stats", UDim2.new(0, col2X, 0, startY + gapY), "Stats")
 
--- ===== КАСТОМНЫЕ КНОПКИ =====
+-- === ПОЛЕ ВВОДА СКОРОСТИ ===
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Name = "SpeedInput"
+SpeedInput.Parent = MainFrame
+SpeedInput.Size = UDim2.new(0, btnWidth, 0, btnHeight)
+SpeedInput.Position = UDim2.new(0, col1X, 0, startY + gapY*2 - 5)
+SpeedInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SpeedInput.Text = tostring(Config.BoostSpeed)
+SpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedInput.TextSize = 13
+SpeedInput.Font = Enum.Font.Gotham
+SpeedInput.PlaceholderText = "Скорость"
+SpeedInput.ClearTextOnFocus = false
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 5)
+inputCorner.Parent = SpeedInput
+
+SpeedInput.FocusLost:Connect(function(enterPressed)
+    local newVal = tonumber(SpeedInput.Text)
+    if newVal then
+        Config.BoostSpeed = math.clamp(newVal, 0.01, 1)  -- ограничим разумными пределами
+        SpeedInput.Text = tostring(Config.BoostSpeed)
+    else
+        SpeedInput.Text = tostring(Config.BoostSpeed)
+    end
+end)
+
+-- ===== ОСТАЛЬНЫЕ КНОПКИ (сдвинуты вниз из-за поля ввода) =====
 -- Anti-AFK
 local antiAfkBtn = Instance.new("TextButton")
 antiAfkBtn.Name = "Anti-AFK"
 antiAfkBtn.Parent = MainFrame
 antiAfkBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-antiAfkBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*2)
+antiAfkBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*2 - 5)
 antiAfkBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 antiAfkBtn.Text = "Anti-AFK: OFF"
 antiAfkBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -149,7 +180,7 @@ local unlockFpsBtn = Instance.new("TextButton")
 unlockFpsBtn.Name = "UnlockFPS"
 unlockFpsBtn.Parent = MainFrame
 unlockFpsBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-unlockFpsBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*2)
+unlockFpsBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*3 - 5)
 unlockFpsBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 unlockFpsBtn.Text = "Unlock FPS: OFF"
 unlockFpsBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -163,7 +194,7 @@ local antiFlingBtn = Instance.new("TextButton")
 antiFlingBtn.Name = "AntiFling"
 antiFlingBtn.Parent = MainFrame
 antiFlingBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-antiFlingBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*3)
+antiFlingBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*3 - 5)
 antiFlingBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 antiFlingBtn.Text = "Anti-Fling: OFF"
 antiFlingBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -177,7 +208,7 @@ local playerListBtn = Instance.new("TextButton")
 playerListBtn.Name = "PlayerListBtn"
 playerListBtn.Parent = MainFrame
 playerListBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-playerListBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*3)
+playerListBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*4 - 5)
 playerListBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 playerListBtn.Text = "Player List"
 playerListBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -191,7 +222,7 @@ local teleportBtn = Instance.new("TextButton")
 teleportBtn.Name = "TeleportBtn"
 teleportBtn.Parent = MainFrame
 teleportBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
-teleportBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*4)
+teleportBtn.Position = UDim2.new(0, col2X, 0, startY + gapY*4 - 5)
 teleportBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 teleportBtn.Text = "Teleport"
 teleportBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -200,7 +231,25 @@ teleportBtn.TextSize = 13
 teleportBtn.BorderSizePixel = 0
 Instance.new("UICorner", teleportBtn).CornerRadius = UDim.new(0, 5)
 
--- Фрейм списка игроков (дочерний MainFrame)
+-- Rejoin
+local rejoinBtn = Instance.new("TextButton")
+rejoinBtn.Name = "RejoinBtn"
+rejoinBtn.Parent = MainFrame
+rejoinBtn.Size = UDim2.new(0, btnWidth, 0, btnHeight)
+rejoinBtn.Position = UDim2.new(0, col1X, 0, startY + gapY*5 - 5)
+rejoinBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+rejoinBtn.Text = "Rejoin"
+rejoinBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+rejoinBtn.Font = Enum.Font.Gotham
+rejoinBtn.TextSize = 13
+rejoinBtn.BorderSizePixel = 0
+Instance.new("UICorner", rejoinBtn).CornerRadius = UDim.new(0, 5)
+
+rejoinBtn.MouseButton1Click:Connect(function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+end)
+
+-- Фрейм списка игроков
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Name = "PlayerListFrame"
 PlayerListFrame.Parent = MainFrame
@@ -223,28 +272,20 @@ listScrolling.BackgroundTransparency = 1
 local StatsLabel = Instance.new("TextLabel")
 StatsLabel.Name = "StatsLabel"
 StatsLabel.Parent = ScreenGui
-StatsLabel.Size = UDim2.new(0, 210, 0, 40)
-StatsLabel.Position = UDim2.new(1, -220, 0, 50)
+StatsLabel.Size = UDim2.new(0, 250, 0, 40)
+StatsLabel.Position = UDim2.new(1, -260, 0, 50)
 StatsLabel.BackgroundTransparency = 1
 StatsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 StatsLabel.TextSize = 16
 StatsLabel.Font = Enum.Font.Gotham
 StatsLabel.TextXAlignment = Enum.TextXAlignment.Right
+StatsLabel.RichText = true
 StatsLabel.Visible = false
 
--- Переменные для FPS и Anti-AFK
-local lastFrameTime = tick()
-local lastStatsUpdate = tick()
-local antiAFKThread = nil
-
--- Функция Anti-AFK
+-- === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 local function startAntiAFK()
-    if antiAFKThread then
-        task.cancel(antiAFKThread)
-        antiAFKThread = nil
-    end
+    if antiAFKThread then task.cancel(antiAFKThread) antiAFKThread = nil end
     if not Config.AntiAFK then return end
-
     antiAFKThread = task.spawn(function()
         while Config.AntiAFK do
             wait(180)
@@ -259,13 +300,10 @@ local function startAntiAFK()
     end)
 end
 
--- Функция разблокировки FPS
 local function applyFPSUnlock()
     if Config.UnlockFPS then
         local success = false
-        if setfpscap then
-            pcall(function() setfpscap(10000) success = true end)
-        end
+        if setfpscap then pcall(function() setfpscap(10000) success = true end) end
         if not success and settings and settings().Rendering then
             pcall(function() settings().Rendering.FrameRateCap = 10000 success = true end)
         end
@@ -300,10 +338,7 @@ antiAfkBtn.MouseButton1Click:Connect(function()
         antiAfkBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         antiAfkBtn.Text = "Anti-AFK: OFF"
         antiAfkBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        if antiAFKThread then
-            task.cancel(antiAFKThread)
-            antiAFKThread = nil
-        end
+        if antiAFKThread then task.cancel(antiAFKThread) antiAFKThread = nil end
     end
 end)
 
@@ -334,7 +369,7 @@ antiFlingBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Заполнение списка игроков с DisplayName
+-- Заполнение списка игроков
 local function updatePlayerList()
     for _, child in ipairs(listScrolling:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -374,10 +409,22 @@ end
 
 playerListBtn.MouseButton1Click:Connect(function()
     PlayerListFrame.Visible = not PlayerListFrame.Visible
-    if PlayerListFrame.Visible then
-        updatePlayerList()
-    end
+    if PlayerListFrame.Visible then updatePlayerList() end
 end)
+
+local function forceTeleport(targetPos)
+    local myChar = lp.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = myChar.HumanoidRootPart
+    local goal = CFrame.new(targetPos + Vector3.new(0, 2, 0))
+    if myChar.PivotTo then myChar:PivotTo(goal) else hrp.CFrame = goal end
+    local startTime = tick()
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if tick() - startTime > 0.15 then connection:Disconnect() return end
+        if myChar.PivotTo then myChar:PivotTo(goal) else hrp.CFrame = goal end
+    end)
+end
 
 teleportBtn.MouseButton1Click:Connect(function()
     if not selectedPlayer then return end
@@ -386,34 +433,69 @@ teleportBtn.MouseButton1Click:Connect(function()
         warn("Игрок не загружен или вне игры")
         return
     end
-    local myChar = lp.Character
-    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
-    myChar.HumanoidRootPart.CFrame = CFrame.new(targetChar.HumanoidRootPart.Position + Vector3.new(0, 2, 0))
+    forceTeleport(targetChar.HumanoidRootPart.Position)
 end)
 
--- === ЛОГИКА ФУНКЦИЙ ===
+-- === ESP (ХИТБОКСЫ) ===
+local function createHitbox(player)
+    local char = player.Character
+    if not char then return end
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    if not torso then return end
+    if torso:FindFirstChild("iMe_Hitbox") then return end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "iMe_Hitbox"
+    box.Parent = torso
+    box.Adornee = torso
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Transparency = 0.5
+    box.Color3 = Color3.fromRGB(255, 0, 0)
+    box.Size = Vector3.new(2.1, 2.1, 1.1)
+end
+
 local function updateESP()
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= lp and p.Character then
-            local hl = p.Character:FindFirstChild("iMe_ESP")
-            if hl then
-                hl.Enabled = Config.ESP
-            else
-                local newHl = Instance.new("Highlight")
-                newHl.Name = "iMe_ESP"
-                newHl.Parent = p.Character
-                newHl.Enabled = Config.ESP
-                newHl.FillColor = Color3.fromRGB(255, 0, 0)
+        if p ~= lp then
+            if Config.ESP and p.Character then
+                createHitbox(p)
+                local oldHl = p.Character:FindFirstChild("iMe_ESP")
+                if oldHl then oldHl:Destroy() end
+            elseif not Config.ESP and p.Character then
+                local torso = p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso")
+                if torso then
+                    local box = torso:FindFirstChild("iMe_Hitbox")
+                    if box then box:Destroy() end
+                end
             end
         end
     end
 end
 
+-- === ГЛАВНЫЙ ЦИКЛ (RenderStepped) ===
 RunService.RenderStepped:Connect(function()
-    updateESP()
-    
+    updateESP()   -- обновление ESP каждый кадр
+
     local char = lp.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
+    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
+        -- обновляем статистику даже если персонажа нет (чтобы метка не висла)
+        local now = tick()
+        if Config.Stats then
+            StatsLabel.Visible = true
+            if now - lastStatsUpdate >= 0.1 then
+                local delta = now - lastFrameTime
+                local fps = (delta > 0) and (1 / delta) or 60
+                local ping = lp:GetNetworkPing() * 1000
+                StatsLabel.Text = string.format("FPS: <font color='#00FF00'>%.3f</font> | Ping: <font color='#00FF00'>%d</font> ms", fps, math.floor(ping))
+                lastStatsUpdate = now
+            end
+        else
+            StatsLabel.Visible = false
+        end
+        lastFrameTime = now
+        return
+    end
+
     local hrp = char.HumanoidRootPart
     local hum = char.Humanoid
 
@@ -449,7 +531,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- RGB-рамка
+    -- RGB рамка меню
     if MainFrame.Visible then
         local t = tick()
         local r = 127 + 127 * math.sin(t * 0.8)
@@ -458,15 +540,21 @@ RunService.RenderStepped:Connect(function()
         stroke.Color = Color3.fromRGB(r, g, b)
     end
 
-    -- FPS и Ping
+    -- Статистика (FPS + Ping)
     local now = tick()
     if Config.Stats then
         StatsLabel.Visible = true
-        if now - lastStatsUpdate >= 0.01 then
+        if now - lastStatsUpdate >= 0.1 then
             local delta = now - lastFrameTime
             local fps = (delta > 0) and (1 / delta) or 60
-            local ping = lp:GetNetworkPing() * 1000
-            StatsLabel.Text = string.format("FPS: %.3f | Ping: %.3f ms", fps, ping)
+            local ping_real = lp:GetNetworkPing() * 1000
+            local ping_int = math.floor(ping_real)
+            local ping_frac = math.random(0, 999)
+            local ping_frac_str = string.format("%03d", ping_frac)
+            StatsLabel.Text = string.format(
+                "FPS: <font color='#00FF00'>%.3f</font> | Ping: <font color='#00FF00'>%d</font><font color='#FF0000'>.%s</font> ms",
+                fps, ping_int, ping_frac_str
+            )
             lastStatsUpdate = now
         end
     else
@@ -475,7 +563,7 @@ RunService.RenderStepped:Connect(function()
     lastFrameTime = now
 end)
 
--- Перемещение меню
+-- === ПЕРЕМЕЩЕНИЕ МЕНЮ (Drag) ===
 local dragging, dragInput, dragStart, startPos
 local function update(input)
     local delta = input.Position - dragStart
